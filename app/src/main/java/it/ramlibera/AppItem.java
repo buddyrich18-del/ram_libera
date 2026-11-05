@@ -8,7 +8,6 @@ final class AppItem {
     Drawable icon;
     boolean system;
     boolean blocked;
-    boolean excluded;
     boolean prot;
     boolean suggested;
 }

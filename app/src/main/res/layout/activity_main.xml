@@ -42,13 +42,6 @@
             android:text="Libera RAM" />
 
         <Button
-            android:id="@+id/blockAll"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="Blocca tutte" />
-
-        <Button
             android:id="@+id/unblockAll"
             android:layout_width="0dp"
             android:layout_weight="1"
@@ -67,7 +60,7 @@
         android:layout_height="wrap_content"
         android:paddingTop="8dp"
         android:paddingBottom="4dp"
-        android:text="Spunta = esclusa da «Blocca tutte»   ·   Interruttore = bloccata"
+        android:text="Spunta = bloccata in background"
         android:textColor="#888888"
         android:textSize="12sp" />
 

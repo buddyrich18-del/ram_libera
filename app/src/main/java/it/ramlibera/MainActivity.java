@@ -2,9 +2,7 @@ package it.ramlibera;
 
 import android.app.Activity;
 import android.app.ActivityManager;
-import android.app.AlertDialog;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
@@ -32,7 +30,6 @@ import rikka.shizuku.Shizuku;
 public class MainActivity extends Activity implements AppAdapter.Listener {
 
     private static final int REQ = 42;
-    private static final String KEY_EXCLUDED = "excluded";
 
     private final ExecutorService bg = Executors.newSingleThreadExecutor();
     private final Handler ui = new Handler(Looper.getMainLooper());
@@ -42,7 +39,6 @@ public class MainActivity extends Activity implements AppAdapter.Listener {
     private Button grant;
     private CheckBox showSys;
     private AppAdapter adapter;
-    private SharedPreferences prefs;
 
     private final Shizuku.OnBinderReceivedListener binderReceived = () -> ui.post(this::refreshStatus);
     private final Shizuku.OnBinderDeadListener binderDead = () -> ui.post(this::refreshStatus);
@@ -53,7 +49,6 @@ public class MainActivity extends Activity implements AppAdapter.Listener {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         setContentView(R.layout.activity_main);
-        prefs = getSharedPreferences("prefs", MODE_PRIVATE);
 
         status = findViewById(R.id.status);
         ram = findViewById(R.id.ram);
@@ -68,7 +63,6 @@ public class MainActivity extends Activity implements AppAdapter.Listener {
             try { Shizuku.requestPermission(REQ); } catch (Exception e) { toast(notReadyMsg()); }
         });
         findViewById(R.id.freeRam).setOnClickListener(v -> freeRam());
-        findViewById(R.id.blockAll).setOnClickListener(v -> confirmBlockAll());
         findViewById(R.id.unblockAll).setOnClickListener(v -> unblockAll());
         showSys.setOnCheckedChangeListener((x, c) -> loadApps());
 
@@ -136,10 +130,6 @@ public class MainActivity extends Activity implements AppAdapter.Listener {
         if (ri != null && ri.activityInfo != null) protectedPkgs.add(ri.activityInfo.packageName);
     }
 
-    private Set<String> excluded() {
-        return new HashSet<>(prefs.getStringSet(KEY_EXCLUDED, new HashSet<>()));
-    }
-
     private Set<String> queryBlocked() {
         Set<String> out = new HashSet<>();
         if (!isReady()) return out;
@@ -156,7 +146,6 @@ public class MainActivity extends Activity implements AppAdapter.Listener {
         bg.execute(() -> {
             PackageManager pm = getPackageManager();
             Set<String> blocked = queryBlocked();
-            Set<String> ex = excluded();
             List<AppItem> items = new ArrayList<>();
             for (ApplicationInfo ai : pm.getInstalledApplications(0)) {
                 boolean isSys = (ai.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
@@ -168,7 +157,6 @@ public class MainActivity extends Activity implements AppAdapter.Listener {
                 it.icon = ai.loadIcon(pm);
                 it.system = isSys;
                 it.blocked = blocked.contains(ai.packageName);
-                it.excluded = ex.contains(ai.packageName);
                 it.prot = protectedPkgs.contains(ai.packageName);
                 it.suggested = isSys && Suggested.SAFE.contains(ai.packageName);
                 items.add(it);
@@ -193,34 +181,6 @@ public class MainActivity extends Activity implements AppAdapter.Listener {
             it.blocked = queryBlocked().contains(it.pkg);
             ui.post(() -> { adapter.notifyDataSetChanged(); updateRam(); });
         });
-    }
-
-    @Override
-    public void onExclude(AppItem it, boolean ex) {
-        Set<String> s = excluded();
-        if (ex) s.add(it.pkg); else s.remove(it.pkg);
-        prefs.edit().putStringSet(KEY_EXCLUDED, s).apply();
-        it.excluded = ex;
-    }
-
-    private List<String> blockTargets() {
-        List<String> t = new ArrayList<>();
-        for (AppItem it : adapter.getItems()) {
-            if (!it.system && !it.excluded && !it.prot && !it.blocked) t.add(it.pkg);
-        }
-        return t;
-    }
-
-    private void confirmBlockAll() {
-        if (!isReady()) { toast(notReadyMsg()); return; }
-        List<String> t = blockTargets();
-        if (t.isEmpty()) { toast("Nessuna app da bloccare"); return; }
-        new AlertDialog.Builder(this)
-                .setMessage("Bloccare in background " + t.size()
-                        + " app? Le escluse (spunta) restano libere.")
-                .setPositiveButton("Blocca", (d, w) -> runBatch(t, true))
-                .setNegativeButton("Annulla", null)
-                .show();
     }
 
     private void unblockAll() {
