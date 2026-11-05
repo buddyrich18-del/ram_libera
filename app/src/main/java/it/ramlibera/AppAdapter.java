@@ -54,7 +54,7 @@ final class AppAdapter extends BaseAdapter {
         icon.setImageDrawable(it.icon);
         name.setText(it.label);
         String info = it.prot ? "protetta" : (it.blocked ? "bloccata in background" : "libera");
-        if (it.system) info += " · sistema";
+        if (it.system) info += it.suggested ? " · sistema · consigliata" : " · sistema";
         sub.setText(info);
 
         ex.setOnCheckedChangeListener(null);

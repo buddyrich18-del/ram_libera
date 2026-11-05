@@ -10,4 +10,5 @@ final class AppItem {
     boolean blocked;
     boolean excluded;
     boolean prot;
+    boolean suggested;
 }

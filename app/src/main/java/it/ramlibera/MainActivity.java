@@ -65,7 +65,7 @@ public class MainActivity extends Activity implements AppAdapter.Listener {
         list.setAdapter(adapter);
 
         grant.setOnClickListener(v -> {
-            try { Shizuku.requestPermission(REQ); } catch (Exception e) { toast("Shizuku non attivo"); }
+            try { Shizuku.requestPermission(REQ); } catch (Exception e) { toast(notReadyMsg()); }
         });
         findViewById(R.id.freeRam).setOnClickListener(v -> freeRam());
         findViewById(R.id.blockAll).setOnClickListener(v -> confirmBlockAll());
@@ -82,6 +82,7 @@ public class MainActivity extends Activity implements AppAdapter.Listener {
     @Override
     protected void onResume() {
         super.onResume();
+        refreshStatus();
         updateRam();
     }
 
@@ -105,12 +106,19 @@ public class MainActivity extends Activity implements AppAdapter.Listener {
         }
     }
 
+    private String notReadyMsg() {
+        boolean alive;
+        try { alive = Shizuku.pingBinder(); } catch (Exception e) { alive = false; }
+        return alive ? "Permesso Shizuku mancante" : "Shizuku non attivo";
+    }
+
     private void refreshStatus() {
         boolean alive;
         try { alive = Shizuku.pingBinder(); } catch (Exception e) { alive = false; }
         boolean ok = isReady();
         status.setText(ok ? "Shizuku attivo"
-                : alive ? "Concedi il permesso a Shizuku" : "Shizuku non attivo: avvialo dall'app Shizuku");
+                : alive ? "Concedi il permesso a Shizuku"
+                : "Shizuku non attivo: avvialo, poi chiudi e riapri questa app");
         grant.setVisibility(alive && !ok ? View.VISIBLE : View.GONE);
         loadApps();
     }
@@ -120,6 +128,7 @@ public class MainActivity extends Activity implements AppAdapter.Listener {
     private void computeProtected() {
         protectedPkgs.add(getPackageName());
         protectedPkgs.add("moe.shizuku.privileged.api");
+        protectedPkgs.addAll(Suggested.NEVER);
         String ime = Settings.Secure.getString(getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
         if (ime != null && ime.contains("/")) protectedPkgs.add(ime.substring(0, ime.indexOf('/')));
         Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
@@ -161,9 +170,11 @@ public class MainActivity extends Activity implements AppAdapter.Listener {
                 it.blocked = blocked.contains(ai.packageName);
                 it.excluded = ex.contains(ai.packageName);
                 it.prot = protectedPkgs.contains(ai.packageName);
+                it.suggested = isSys && Suggested.SAFE.contains(ai.packageName);
                 items.add(it);
             }
-            items.sort((a, c) -> a.label.compareToIgnoreCase(c.label));
+            items.sort((a, c) -> a.suggested != c.suggested ? (a.suggested ? -1 : 1)
+                    : a.label.compareToIgnoreCase(c.label));
             ui.post(() -> adapter.setItems(items));
         });
     }
@@ -173,7 +184,7 @@ public class MainActivity extends Activity implements AppAdapter.Listener {
     @Override
     public void onToggle(AppItem it, boolean block) {
         if (!isReady()) {
-            toast("Shizuku non attivo");
+            toast(notReadyMsg());
             adapter.notifyDataSetChanged();
             return;
         }
@@ -201,7 +212,7 @@ public class MainActivity extends Activity implements AppAdapter.Listener {
     }
 
     private void confirmBlockAll() {
-        if (!isReady()) { toast("Shizuku non attivo"); return; }
+        if (!isReady()) { toast(notReadyMsg()); return; }
         List<String> t = blockTargets();
         if (t.isEmpty()) { toast("Nessuna app da bloccare"); return; }
         new AlertDialog.Builder(this)
@@ -213,7 +224,7 @@ public class MainActivity extends Activity implements AppAdapter.Listener {
     }
 
     private void unblockAll() {
-        if (!isReady()) { toast("Shizuku non attivo"); return; }
+        if (!isReady()) { toast(notReadyMsg()); return; }
         bg.execute(() -> {
             List<String> t = new ArrayList<>(queryBlocked());
             ui.post(() -> {
@@ -237,7 +248,7 @@ public class MainActivity extends Activity implements AppAdapter.Listener {
     }
 
     private void freeRam() {
-        if (!isReady()) { toast("Shizuku non attivo"); return; }
+        if (!isReady()) { toast(notReadyMsg()); return; }
         final long before = availMb();
         bg.execute(() -> {
             Sh.run("am kill-all");
